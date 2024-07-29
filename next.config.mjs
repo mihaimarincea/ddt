@@ -1,4 +1,9 @@
 /** @type {import('next').NextConfig} */
-const nextConfig = {};
-
-export default nextConfig;
+const nextConfig = {
+    reactStrictMode: true,
+    env: {
+      CLAUDE_API_KEY: process.env.CLAUDE_API_KEY,
+    },
+  }
+  
+  export default nextConfig;
