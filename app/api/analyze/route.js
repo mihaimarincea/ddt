@@ -2,14 +2,6 @@ import { NextResponse } from 'next/server';
 import axios from 'axios';
 import { saveEntry } from '../../../utils/dataStore';
 
-export const config = {
-  api: {
-    bodyParser: {
-      sizeLimit: '1mb',
-    },
-    responseLimit: '8mb',
-  },
-};
 
 export async function POST(request) {
   console.log('API route /api/analyze called');
@@ -17,8 +9,54 @@ export async function POST(request) {
     const body = await request.json();
     console.log('Received request body:', body);
 
-    // ... (rest of the code remains the same until the axios call)
+    const prompt = `
+      Analyze the following startup due diligence information and provide a concise response:
+      ${JSON.stringify(body, null, 2)}
+      
+      Provide a brief analysis covering:
+      1. Company Overview
+      2. Product and Market Fit
+      3. Competitive Landscape
+      4. Financial Health
+      5. Team and Execution
+      6. Growth Potential
+      7. Overall Assessment
+      
+      Also provide the following data for a dashboard:
+      1. Financial Metrics (Revenue, Gross Margin, Net Profit, Burn Rate)
+      2. SWOT Analysis (2-3 points each)
+      3. Potential Meter (a percentage)
+      4. General Business Score (out of 100)
+      5. Key Problems (top 3)
 
+      Be concise but critical in your analysis. Highlight key strengths and risks.
+      
+      Respond ONLY with the following JSON format, without any additional text before or after:
+      {
+        "analysis": "Your full analysis here as a single string",
+        "dashboardData": {
+          "financialMetrics": {
+            "revenue": 0,
+            "grossMargin": 0,
+            "netProfit": 0,
+            "burnRate": 0
+          },
+          "swot": {
+            "strengths": ["1", "2", "3"],
+            "weaknesses": ["1", "2", "3"],
+            "opportunities": ["1", "2", "3"],
+            "threats": ["1", "2", "3"]
+          },
+          "potentialMeter": 0,
+          "generalScore": 0,
+          "keyProblems": ["1", "2", "3"]
+        }
+      }
+
+      Ensure all fields are present, using null for unknown numeric values and empty arrays for unknown lists.
+    `;
+
+    console.log('Sending request to Claude API');
     const response = await axios.post(
       'https://api.anthropic.com/v1/messages',
       {
@@ -31,24 +69,34 @@ export async function POST(request) {
           'Content-Type': 'application/json',
           'x-api-key': process.env.CLAUDE_API_KEY,
           'anthropic-version': '2023-06-01'
-        },
-        timeout: 60000 // 60 seconds timeout
+        }
       }
     );
 
     console.log('Received response from Claude API');
     let analysisData;
     try {
+      // Try to parse the entire response
       analysisData = JSON.parse(response.data.content[0].text);
     } catch (parseError) {
-      console.error('Error parsing Claude API response:', parseError);
-      console.error('Raw response:', response.data.content[0].text);
-      return NextResponse.json({ 
-        message: 'Error parsing AI response', 
-        error: parseError.message,
-        rawResponse: response.data.content[0].text.substring(0, 1000) // First 1000 characters for debugging
-      }, { status: 500 });
+      console.error('Error parsing entire Claude API response:', parseError);
+      
+      // If parsing fails, try to extract and parse only the JSON part
+      const jsonMatch = response.data.content[0].text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        try {
+          analysisData = JSON.parse(jsonMatch[0]);
+        } catch (secondParseError) {
+          console.error('Error parsing extracted JSON:', secondParseError);
+          throw new Error('Failed to parse Claude API response');
+        }
+      } else {
+        console.error('No valid JSON found in Claude API response');
+        throw new Error('No valid JSON found in Claude API response');
+      }
     }
+
+    console.log('Parsed analysis data:', analysisData);
 
     console.log('Parsed analysis data:', analysisData);
 
@@ -67,24 +115,6 @@ export async function POST(request) {
     return NextResponse.json(analysisData);
   } catch (error) {
     console.error('Unhandled error in /api/analyze:', error);
-    let errorMessage = 'Internal server error';
-    let errorDetails = 'No additional details available';
-
-    if (error.response) {
-      console.error('Error response:', error.response.data);
-      errorMessage = error.response.data.message || errorMessage;
-      errorDetails = error.response.data.error || errorDetails;
-    } else if (error.request) {
-      console.error('Error request:', error.request);
-      errorMessage = 'No response received from the server';
-    } else {
-      console.error('Error message:', error.message);
-      errorMessage = error.message;
-    }
-
-    return NextResponse.json({ 
-      message: errorMessage, 
-      error: errorDetails
-    }, { status: 500 });
+    return NextResponse.json({ message: 'Internal server error', error: error.message }, { status: 500 });
   }
 }

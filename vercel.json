@@ -1,0 +1,7 @@
+{
+    "functions": {
+      "app/api/admin/login/route.js": {
+        "maxDuration": 10
+      }
+    }
+  }
