@@ -1,52 +1,117 @@
 import { NextResponse } from 'next/server';
-import { sign } from 'jsonwebtoken';
+import axios from 'axios';
+import { saveEntry } from '../../../utils/dataStore';
 
-const ADMIN_USERNAME = process.env.ADMIN_USERNAME;
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
-const JWT_SECRET = process.env.JWT_SECRET;
-
-export const config = {
-  api: {
-    bodyParser: {
-      sizeLimit: '1mb',
-    },
-    responseLimit: '8mb',
-  },
-};
+export const runtime = 'edge'; // Optional: Use Edge runtime
 
 export async function POST(request) {
-  console.log('Login API called');
-  
+  console.log('API route /api/analyze called');
   try {
-    const { username, password } = await request.json();
-    console.log('Received credentials:', { username, password: '****' });
+    const body = await request.json();
+    console.log('Received request body:', body);
 
-    if (!ADMIN_USERNAME || !ADMIN_PASSWORD || !JWT_SECRET) {
-      console.error('Missing environment variables');
-      return NextResponse.json({ message: 'Server configuration error' }, { status: 500 });
+    const prompt = `
+      Analyze the following startup due diligence information and provide a concise response:
+      ${JSON.stringify(body, null, 2)}
+      
+      Provide a brief analysis covering:
+      1. Company Overview
+      2. Product and Market Fit
+      3. Competitive Landscape
+      4. Financial Health
+      5. Team and Execution
+      6. Growth Potential
+      7. Overall Assessment
+      
+      Also provide the following data for a dashboard:
+      1. Financial Metrics (Revenue, Gross Margin, Net Profit, Burn Rate)
+      2. SWOT Analysis (2-3 points each)
+      3. Potential Meter (a percentage)
+      4. General Business Score (out of 100)
+      5. Key Problems (top 3)
+
+      Be concise but critical in your analysis. Highlight key strengths and risks.
+    `;
+
+    console.log('Sending request to Claude API');
+    const response = await axios.post(
+      'https://api.anthropic.com/v1/messages',
+      {
+        model: 'claude-3-opus-20240229',
+        max_tokens: 2000,
+        messages: [{ role: 'user', content: prompt }]
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': process.env.CLAUDE_API_KEY,
+          'anthropic-version': '2023-06-01'
+        },
+        timeout: 60000 // 60 seconds timeout
+      }
+    );
+
+    console.log('Received response from Claude API');
+    const rawResponse = response.data.content[0].text;
+    console.log('Raw response:', rawResponse);
+
+    // Attempt to extract JSON from the response
+    const jsonMatch = rawResponse.match(/\{[\s\S]*\}/);
+    let analysisData;
+    if (jsonMatch) {
+      try {
+        analysisData = JSON.parse(jsonMatch[0]);
+      } catch (parseError) {
+        console.error('Error parsing extracted JSON:', parseError);
+      }
     }
 
-    if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
-      console.log('Credentials valid, generating token');
-      const token = sign({ username }, JWT_SECRET, { expiresIn: '1h' });
-      console.log('Token generated:', token);
-      
-      const response = NextResponse.json({ token, message: 'Login successful' });
-      response.cookies.set('admin_token', token, { 
-        httpOnly: true, 
-        secure: process.env.NODE_ENV === 'production', 
-        sameSite: 'strict',
-        maxAge: 3600 
+    if (!analysisData) {
+      // If JSON parsing fails, create a structured response from the text
+      analysisData = {
+        analysis: rawResponse,
+        dashboardData: {
+          financialMetrics: {
+            revenue: null,
+            grossMargin: null,
+            netProfit: null,
+            burnRate: null
+          },
+          swot: {
+            strengths: [],
+            weaknesses: [],
+            opportunities: [],
+            threats: []
+          },
+          potentialMeter: null,
+          generalScore: null,
+          keyProblems: []
+        }
+      };
+    }
+
+    console.log('Parsed analysis data:', analysisData);
+
+    // Save the entry
+    try {
+      saveEntry({
+        input: body,
+        analysis: analysisData
       });
-      
-      console.log('Token set in cookie');
-      return response;
-    } else {
-      console.log('Invalid credentials');
-      return NextResponse.json({ message: 'Invalid credentials' }, { status: 401 });
+    } catch (saveError) {
+      console.error('Error saving entry:', saveError);
     }
+
+    return NextResponse.json(analysisData);
   } catch (error) {
-    console.error('Error in login API:', error);
-    return NextResponse.json({ message: 'Server error', error: error.message }, { status: 500 });
+    console.error('Unhandled error in /api/analyze:', error);
+    if (error.response) {
+      console.error('Error response:', error.response.data);
+    }
+    return NextResponse.json({ 
+      message: 'Internal server error', 
+      error: error.message,
+      details: error.response?.data || 'No additional details available'
+    }, { status: 500 });
   }
 }
