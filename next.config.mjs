@@ -10,9 +10,8 @@ const nextConfig = {
   // This setting allows the Edge runtime to access environment variables
   serverRuntimeConfig: {
     CLAUDE_API_KEY: process.env.CLAUDE_API_KEY,
-    JWT_SECRET: process.env.JWT_SECRET,
-    ADMIN_USERNAME: process.env.ADMIN_USERNAME,
-    ADMIN_PASSWORD: process.env.ADMIN_PASSWORD,
+    KV_REST_API_URL: process.env.KV_REST_API_URL,
+    KV_REST_API_TOKEN: process.env.KV_REST_API_TOKEN,
   },
 }
 
