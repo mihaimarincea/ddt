@@ -61,7 +61,11 @@ export async function POST(request) {
     return NextResponse.json({ status: 'completed', analysisData });
   } catch (error) {
     console.error('Error in analysis:', error);
-    return NextResponse.json({ status: 'failed', error: error.message }, { status: 500 });
+    return NextResponse.json({ 
+      status: 'failed', 
+      error: error.message,
+      details: error.stack
+    }, { status: 500 });
   }
 }
 

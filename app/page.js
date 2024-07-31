@@ -21,18 +21,18 @@ export default function Home() {
         body: JSON.stringify(answers),
       });
       
+      const data = await response.json();
+      
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(`HTTP error! status: ${response.status}, message: ${JSON.stringify(errorData)}`);
+        throw new Error(`HTTP error! status: ${response.status}, message: ${data.error || 'Unknown error'}`);
       }
       
-      const data = await response.json();
       console.log('Received analysis data:', data);
       
       if (data.status === 'completed') {
         setAnalysisData(data.analysisData);
       } else if (data.status === 'failed') {
-        setError(`Analysis failed: ${data.error}`);
+        throw new Error(`Analysis failed: ${data.error}`);
       }
     } catch (error) {
       console.error('Error in analysis:', error);
