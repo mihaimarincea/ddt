@@ -4,6 +4,9 @@ const nextConfig = {
   env: {
     CLAUDE_API_KEY: process.env.CLAUDE_API_KEY,
   },
+  experimental: {
+    runtime: 'experimental-edge',
+  },
   // This setting allows the Edge runtime to access environment variables
   serverRuntimeConfig: {
     CLAUDE_API_KEY: process.env.CLAUDE_API_KEY,
