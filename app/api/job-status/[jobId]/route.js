@@ -11,28 +11,40 @@ export async function GET(request, { params }) {
   try {
     if (!kv) {
       console.error('KV store is not initialized');
-      return NextResponse.json({ error: 'KV store not available' }, { status: 500 });
+      return NextResponse.json({ error: 'KV store not available', details: 'KV object is undefined' }, { status: 500 });
     }
 
-    const jobData = await kv.get(jobId);
-    console.log(`Job data retrieved: ${JSON.stringify(jobData)}`);
+    console.log('Attempting to get job data from KV store');
+    let jobData;
+    try {
+      jobData = await kv.get(jobId);
+    } catch (kvError) {
+      console.error(`Error accessing KV store: ${kvError}`);
+      return NextResponse.json({ error: 'Failed to access KV store', details: kvError.message }, { status: 500 });
+    }
+
+    console.log(`Job data retrieved: ${jobData}`);
 
     if (!jobData) {
       console.log(`Job not found: ${jobId}`);
-      return NextResponse.json({ error: 'Job not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Job not found', jobId }, { status: 404 });
     }
 
-    let parsedJobData;
+    // If jobData is already an object, return it directly
+    if (typeof jobData === 'object' && jobData !== null) {
+      return NextResponse.json(jobData);
+    }
+
+    // If jobData is a string, try to parse it
     try {
-      parsedJobData = JSON.parse(jobData);
+      const parsedData = JSON.parse(jobData);
+      return NextResponse.json(parsedData);
     } catch (parseError) {
       console.error(`Error parsing job data: ${parseError}`);
-      return NextResponse.json({ error: 'Invalid job data' }, { status: 500 });
+      return NextResponse.json({ error: 'Invalid job data', details: parseError.message, rawData: jobData }, { status: 500 });
     }
-
-    return NextResponse.json(parsedJobData);
   } catch (error) {
-    console.error(`Error fetching job status: ${error}`);
-    return NextResponse.json({ error: 'Failed to fetch job status', details: error.message }, { status: 500 });
+    console.error(`Unexpected error fetching job status: ${error}`);
+    return NextResponse.json({ error: 'Failed to fetch job status', details: error.message, stack: error.stack }, { status: 500 });
   }
 }

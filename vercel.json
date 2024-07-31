@@ -1,13 +1,17 @@
 {
   "functions": {
-    "app/api/admin/login/route.js": {
-      "maxDuration": 60
-    },
     "app/api/analyze/route.js": {
-      "maxDuration": 60
+      "maxDuration": 300
     }
   },
-  "github": {
-    "silent": true
-  }
+  "routes": [
+    {
+      "src": "/api/analyze",
+      "dest": "/api/analyze",
+      "methods": ["POST"],
+      "headers": {
+        "Cache-Control": "no-cache, no-store, must-revalidate"
+      }
+    }
+  ]
 }

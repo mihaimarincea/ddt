@@ -1,29 +1,12 @@
 import { NextResponse } from 'next/server';
-import { kv } from '@vercel/kv';
 
 export const runtime = 'edge';
 
 export async function POST(request) {
+  console.log('API route /api/analyze called');
   try {
     const body = await request.json();
-    const jobId = `job_${Date.now()}`;
-
-    // Store the job in KV store
-    await kv.set(jobId, JSON.stringify({ status: 'pending', body }));
-
-    // Initiate the background job
-    backgroundJob(jobId, body);
-
-    return NextResponse.json({ jobId });
-  } catch (error) {
-    console.error('Error initiating job:', error);
-    return NextResponse.json({ error: 'Failed to initiate analysis' }, { status: 500 });
-  }
-}
-
-async function backgroundJob(jobId, body) {
-  try {
-    await kv.set(jobId, JSON.stringify({ status: 'processing', body }));
+    console.log('Received request body:', body);
 
     const prompt = `
       Analyze the following startup due diligence information and provide a concise response:
@@ -48,6 +31,7 @@ async function backgroundJob(jobId, body) {
       Be concise but critical in your analysis. Highlight key strengths and risks.
     `;
 
+    console.log('Sending request to Claude API');
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -66,82 +50,79 @@ async function backgroundJob(jobId, body) {
       throw new Error(`Claude API responded with status: ${response.status}`);
     }
 
+    console.log('Received response from Claude API');
     const data = await response.json();
     const rawResponse = data.content[0].text;
-    const analysisData = parseResponse(rawResponse);
+    console.log('Raw response from Claude:', rawResponse);
 
-    await kv.set(jobId, JSON.stringify({ status: 'completed', analysisData }));
+    const analysisData = parseResponse(rawResponse);
+    console.log('Parsed analysis data:', analysisData);
+
+    return NextResponse.json({ status: 'completed', analysisData });
   } catch (error) {
-    console.error('Error in background job:', error);
-    await kv.set(jobId, JSON.stringify({ status: 'failed', error: error.message }));
+    console.error('Error in analysis:', error);
+    return NextResponse.json({ status: 'failed', error: error.message }, { status: 500 });
   }
 }
+
 function parseResponse(rawResponse) {
-  let analysisData = {
-    analysis: rawResponse,
-    dashboardData: {
-      financialMetrics: {
-        revenue: null,
-        grossMargin: null,
-        netProfit: null,
-        burnRate: null
-      },
-      swot: {
-        strengths: [],
-        weaknesses: [],
-        opportunities: [],
-        threats: []
-      },
-      potentialMeter: null,
-      generalScore: null,
+  try {
+    const analysis = rawResponse;
+    const dashboardData = {
+      financialMetrics: { revenue: 0, grossMargin: 0, netProfit: 0, burnRate: 0 },
+      swot: { strengths: [], weaknesses: [], opportunities: [], threats: [] },
+      potentialMeter: 0,
+      generalScore: 0,
       keyProblems: []
-    }
-  };
-
-  // Parse financial metrics
-  const financialMetricsMatch = rawResponse.match(/Financial Metrics:[\s\S]*?Revenue: \$(\d+)M[\s\S]*?Gross Margin: (\d+)%[\s\S]*?Net Profit: -?\$(\d+)K[\s\S]*?Burn Rate: \$(\d+)K\/month/);
-  if (financialMetricsMatch) {
-    analysisData.dashboardData.financialMetrics = {
-      revenue: parseFloat(financialMetricsMatch[1]) * 1000000,
-      grossMargin: parseFloat(financialMetricsMatch[2]),
-      netProfit: -parseFloat(financialMetricsMatch[3]) * 1000,
-      burnRate: parseFloat(financialMetricsMatch[4]) * 1000
     };
-  }
 
-  // Parse SWOT analysis
-  const swotMatch = rawResponse.match(/SWOT Analysis:([\s\S]*?)3\. Potential Meter/);
-  if (swotMatch) {
-    const swotText = swotMatch[1];
-    ['strengths', 'weaknesses', 'opportunities', 'threats'].forEach(category => {
-      const categoryMatch = swotText.match(new RegExp(`${category.charAt(0).toUpperCase() + category.slice(1)}: (.+)`));
-      if (categoryMatch) {
-        analysisData.dashboardData.swot[category] = categoryMatch[1].split(', ').map(item => item.trim());
-      }
-    });
-  }
+    // Parse Financial Metrics
+    const financialMetricsMatch = rawResponse.match(/Financial Metrics:\s*- Revenue: \$(\d+)M\s*- Gross Margin: (\d+)%\s*- Net Profit: -?\$(\d+)K\s*- Burn Rate: \$(\d+)K\/month/);
+    if (financialMetricsMatch) {
+      dashboardData.financialMetrics = {
+        revenue: parseFloat(financialMetricsMatch[1]) * 1000000,
+        grossMargin: parseFloat(financialMetricsMatch[2]),
+        netProfit: -parseFloat(financialMetricsMatch[3]) * 1000,
+        burnRate: parseFloat(financialMetricsMatch[4]) * 1000
+      };
+    }
 
-  // Parse Potential Meter
-  const potentialMeterMatch = rawResponse.match(/Potential Meter: (\d+)%/);
-  if (potentialMeterMatch) {
-    analysisData.dashboardData.potentialMeter = parseInt(potentialMeterMatch[1]);
-  }
+    // Parse SWOT Analysis
+    const swotMatch = rawResponse.match(/SWOT Analysis:([\s\S]*?)3\. Potential Meter/);
+    if (swotMatch) {
+      const swotText = swotMatch[1];
+      ['strengths', 'weaknesses', 'opportunities', 'threats'].forEach(category => {
+        const categoryMatch = swotText.match(new RegExp(`${category.charAt(0).toUpperCase() + category.slice(1)}:(.+)`));
+        if (categoryMatch) {
+          dashboardData.swot[category] = categoryMatch[1].split(',').map(item => item.trim());
+        }
+      });
+    }
 
-  // Parse General Business Score
-  const scoreMatch = rawResponse.match(/General Business Score: (\d+)\/100/);
-  if (scoreMatch) {
-    analysisData.dashboardData.generalScore = parseInt(scoreMatch[1]);
-  }
+    // Parse Potential Meter
+    const potentialMeterMatch = rawResponse.match(/Potential Meter: (\d+)%/);
+    if (potentialMeterMatch) {
+      dashboardData.potentialMeter = parseInt(potentialMeterMatch[1]);
+    }
 
-  // Parse Key Problems
-  const keyProblemsMatch = rawResponse.match(/Key Problems:([\s\S]*)/);
-  if (keyProblemsMatch) {
-    analysisData.dashboardData.keyProblems = keyProblemsMatch[1]
-      .split('\n')
-      .map(line => line.trim())
-      .filter(line => line.startsWith('-') || line.match(/^\d+\./))
-      .map(line => line.replace(/^-|\d+\.\s*/, '').trim());
-  }
+    // Parse General Business Score
+    const scoreMatch = rawResponse.match(/General Business Score: (\d+)\/100/);
+    if (scoreMatch) {
+      dashboardData.generalScore = parseInt(scoreMatch[1]);
+    }
 
-  return analysisData;
+    // Parse Key Problems
+    const keyProblemsMatch = rawResponse.match(/Key Problems:([\s\S]*?)$/);
+    if (keyProblemsMatch) {
+      dashboardData.keyProblems = keyProblemsMatch[1].split('\n')
+        .map(line => line.trim())
+        .filter(line => line.match(/^\d+\./))
+        .map(line => line.replace(/^\d+\.\s*/, ''));
+    }
+
+    return { analysis, dashboardData };
+  } catch (error) {
+    console.error('Error parsing Claude response:', error);
+    throw error;
+  }
 }
