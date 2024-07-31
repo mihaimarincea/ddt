@@ -9,9 +9,11 @@ import { testData } from '../utils/testData';
 export default function Home() {
   const [analysisData, setAnalysisData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   const handleAnalysis = async (answers) => {
     setIsLoading(true);
+    setError(null);
     console.log('Submitting answers to API:', answers);
     try {
       const response = await fetch('/api/analyze', {
@@ -20,39 +22,16 @@ export default function Home() {
         body: JSON.stringify(answers),
       });
       
-      let errorData;
-      try {
-        errorData = await response.json();
-      } catch (parseError) {
-        // If parsing as JSON fails, try to get the response as text
-        const textResponse = await response.text();
-        errorData = { message: textResponse };
-      }
-
       if (!response.ok) {
-        console.error('API response not OK:', response.status, response.statusText);
-        console.error('Error details:', errorData);
-        throw new Error(`Analysis failed: ${errorData.message || 'Unknown error'}`);
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
       
-      console.log('Received analysis from API:', errorData);
-      
-      // Ensure the data has the expected structure
-      const formattedData = {
-        analysis: errorData.analysis || '',
-        dashboardData: {
-          financialMetrics: errorData.dashboardData?.financialMetrics || {},
-          swot: errorData.dashboardData?.swot || {},
-          potentialMeter: errorData.dashboardData?.potentialMeter || 0,
-          generalScore: errorData.dashboardData?.generalScore || 0,
-          keyProblems: errorData.dashboardData?.keyProblems || [],
-        },
-      };
-      
-      setAnalysisData(formattedData);
+      const data = await response.json();
+      console.log('Received analysis from API:', data);
+      setAnalysisData(data);
     } catch (error) {
       console.error('Error in API call:', error);
-      alert(`Failed to get analysis: ${error.message}. Please try again or contact support if the problem persists.`);
+      setError(`Failed to get analysis: ${error.message}. Please try again later.`);
     } finally {
       setIsLoading(false);
     }
@@ -76,9 +55,10 @@ export default function Home() {
       {isLoading && (
         <div className="loading">
           <ThreeDots color="#00BFFF" height={80} width={80} />
-          <p>Analyzing your responses... This may take up to a minute.</p>
+          <p>Analyzing your responses... This may take up to 2 minutes.</p>
         </div>
       )}
+      {error && <p className="error">{error}</p>}
       {analysisData && <Dashboard data={analysisData} />}
     </div>
   );
