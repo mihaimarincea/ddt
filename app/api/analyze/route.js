@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
 
-export const config = {
-  runtime: 'edge',
-};
+export const runtime = 'edge';
 
 export async function POST(request) {
   console.log('API route /api/analyze called');
@@ -69,7 +67,6 @@ export async function POST(request) {
     }, { status: 500 });
   }
 }
-
 function parseResponse(rawResponse) {
   let analysisData = {
     analysis: rawResponse,
