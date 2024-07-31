@@ -1,75 +1,80 @@
 import { NextResponse } from 'next/server';
+import { kv } from '@vercel/kv';
 
 export const runtime = 'edge';
 
 export async function POST(request) {
-  const encoder = new TextEncoder();
-  const stream = new ReadableStream({
-    async start(controller) {
-      try {
-        const body = await request.json();
-        controller.enqueue(encoder.encode(JSON.stringify({ message: 'Received request body' }) + '\n'));
+  try {
+    const body = await request.json();
+    const jobId = `job_${Date.now()}`;
 
-        const prompt = `
-          Analyze the following startup due diligence information and provide a concise response:
-          ${JSON.stringify(body, null, 2)}
-          
-          Provide a brief analysis covering:
-          1. Company Overview
-          2. Product and Market Fit
-          3. Competitive Landscape
-          4. Financial Health
-          5. Team and Execution
-          6. Growth Potential
-          7. Overall Assessment
-          
-          Also provide the following data for a dashboard:
-          1. Financial Metrics (Revenue, Gross Margin, Net Profit, Burn Rate)
-          2. SWOT Analysis (2-3 points each)
-          3. Potential Meter (a percentage)
-          4. General Business Score (out of 100)
-          5. Key Problems (top 3)
+    // Store the job in KV store
+    await kv.set(jobId, JSON.stringify({ status: 'pending', body }));
 
-          Be concise but critical in your analysis. Highlight key strengths and risks.
-        `;
+    // Initiate the background job
+    backgroundJob(jobId, body);
 
-        controller.enqueue(encoder.encode(JSON.stringify({ message: 'Sending request to Claude API' }) + '\n'));
+    return NextResponse.json({ jobId });
+  } catch (error) {
+    console.error('Error initiating job:', error);
+    return NextResponse.json({ error: 'Failed to initiate analysis' }, { status: 500 });
+  }
+}
 
-        const response = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': process.env.CLAUDE_API_KEY,
-            'anthropic-version': '2023-06-01'
-          },
-          body: JSON.stringify({
-            model: 'claude-3-opus-20240229',
-            max_tokens: 2000,
-            messages: [{ role: 'user', content: prompt }]
-          })
-        });
+async function backgroundJob(jobId, body) {
+  try {
+    await kv.set(jobId, JSON.stringify({ status: 'processing', body }));
 
-        if (!response.ok) {
-          throw new Error(`Claude API responded with status: ${response.status}`);
-        }
+    const prompt = `
+      Analyze the following startup due diligence information and provide a concise response:
+      ${JSON.stringify(body, null, 2)}
+      
+      Provide a brief analysis covering:
+      1. Company Overview
+      2. Product and Market Fit
+      3. Competitive Landscape
+      4. Financial Health
+      5. Team and Execution
+      6. Growth Potential
+      7. Overall Assessment
+      
+      Also provide the following data for a dashboard:
+      1. Financial Metrics (Revenue, Gross Margin, Net Profit, Burn Rate)
+      2. SWOT Analysis (2-3 points each)
+      3. Potential Meter (a percentage)
+      4. General Business Score (out of 100)
+      5. Key Problems (top 3)
 
-        const data = await response.json();
-        const rawResponse = data.content[0].text;
-        controller.enqueue(encoder.encode(JSON.stringify({ message: 'Received response from Claude API' }) + '\n'));
+      Be concise but critical in your analysis. Highlight key strengths and risks.
+    `;
 
-        const analysisData = parseResponse(rawResponse);
-        controller.enqueue(encoder.encode(JSON.stringify({ analysisData }) + '\n'));
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.CLAUDE_API_KEY,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-3-opus-20240229',
+        max_tokens: 2000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
 
-        controller.close();
-      } catch (error) {
-        controller.error(error);
-      }
+    if (!response.ok) {
+      throw new Error(`Claude API responded with status: ${response.status}`);
     }
-  });
 
-  return new Response(stream, {
-    headers: { 'Content-Type': 'text/event-stream; charset=utf-8' }
-  });
+    const data = await response.json();
+    const rawResponse = data.content[0].text;
+    const analysisData = parseResponse(rawResponse);
+
+    await kv.set(jobId, JSON.stringify({ status: 'completed', analysisData }));
+  } catch (error) {
+    console.error('Error in background job:', error);
+    await kv.set(jobId, JSON.stringify({ status: 'failed', error: error.message }));
+  }
 }
 function parseResponse(rawResponse) {
   let analysisData = {

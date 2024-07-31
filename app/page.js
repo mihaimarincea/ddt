@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ThreeDots } from 'react-loader-spinner';
 import DueDiligenceForm from '../components/DueDiligenceForm';
 import Dashboard from '../components/Dashboard';
 import { testData } from '../utils/testData';
 
 export default function Home() {
+  const [jobId, setJobId] = useState(null);
   const [analysisData, setAnalysisData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -15,8 +16,7 @@ export default function Home() {
   const handleAnalysis = async (answers) => {
     setIsLoading(true);
     setError(null);
-    setStatus('Starting analysis...');
-    console.log('Submitting answers to API:', answers);
+    setStatus('Initiating analysis...');
     try {
       const response = await fetch('/api/analyze', {
         method: 'POST',
@@ -28,35 +28,45 @@ export default function Home() {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        
-        const decodedChunk = decoder.decode(value, { stream: true });
-        const lines = decodedChunk.split('\n');
-        
-        for (const line of lines) {
-          if (line.trim() !== '') {
-            const data = JSON.parse(line);
-            if (data.message) {
-              setStatus(data.message);
-            }
-            if (data.analysisData) {
-              setAnalysisData(data.analysisData);
-              setIsLoading(false);
-            }
-          }
-        }
-      }
+      const data = await response.json();
+      setJobId(data.jobId);
     } catch (error) {
-      console.error('Error in API call:', error);
-      setError(`Failed to get analysis: ${error.message}. Please try again later.`);
+      console.error('Error initiating analysis:', error);
+      setError(`Failed to initiate analysis: ${error.message}. Please try again later.`);
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (jobId) {
+      const pollJobStatus = async () => {
+        try {
+          const response = await fetch(`/api/job-status/${jobId}`);
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          const data = await response.json();
+          
+          if (data.status === 'completed') {
+            setAnalysisData(data.analysisData);
+            setIsLoading(false);
+          } else if (data.status === 'failed') {
+            setError(`Analysis failed: ${data.error}`);
+            setIsLoading(false);
+          } else {
+            setStatus(`Analysis in progress: ${data.status}`);
+            setTimeout(pollJobStatus, 5000); // Poll every 5 seconds
+          }
+        } catch (error) {
+          console.error('Error polling job status:', error);
+          setError(`Failed to get analysis status: ${error.message}. Please try again later.`);
+          setIsLoading(false);
+        }
+      };
+
+      pollJobStatus();
+    }
+  }, [jobId]);
 
   const handleTestCase = () => {
     handleAnalysis(testData);
@@ -65,7 +75,7 @@ export default function Home() {
   return (
     <div className="container">
       <h1>Startup Due Diligence Chat</h1>
-      {!analysisData && !isLoading && (
+      {!jobId && !isLoading && (
         <>
           <DueDiligenceForm onSubmit={handleAnalysis} />
           <button onClick={handleTestCase} className="test-button">
