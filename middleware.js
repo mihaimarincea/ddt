@@ -1,12 +1,11 @@
 import { NextResponse } from 'next/server';
-import { verify } from 'jsonwebtoken';
+import { jwtVerify } from 'jose';
 
-const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
 
-export function middleware(request) {
+export async function middleware(request) {
   console.log('Middleware called for path:', request.nextUrl.pathname);
 
-  // Allow access to the login page without a token
   if (request.nextUrl.pathname === '/admin/login') {
     console.log('Allowing access to login page');
     return NextResponse.next();
@@ -22,7 +21,7 @@ export function middleware(request) {
     }
 
     try {
-      verify(token, JWT_SECRET);
+      await jwtVerify(token, JWT_SECRET);
       console.log('Token verified successfully');
       return NextResponse.next();
     } catch (error) {

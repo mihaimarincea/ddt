@@ -1,11 +1,9 @@
 import { NextResponse } from 'next/server';
-import { sign } from 'jsonwebtoken';
+import { SignJWT, jwtVerify } from 'jose';
 
-const ADMIN_USERNAME = process.env.ADMIN_USERNAME;
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
-const JWT_SECRET = process.env.JWT_SECRET;
+export const runtime = 'edge';
 
-export const runtime = 'edge'; // Optional: Use Edge runtime
+const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
 
 export async function POST(request) {
   console.log('Login API called');
@@ -14,15 +12,15 @@ export async function POST(request) {
     const { username, password } = await request.json();
     console.log('Received credentials:', { username, password: '****' });
 
-    if (!ADMIN_USERNAME || !ADMIN_PASSWORD || !JWT_SECRET) {
-      console.error('Missing environment variables');
-      return NextResponse.json({ message: 'Server configuration error' }, { status: 500 });
-    }
-
-    if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
+    if (username === process.env.ADMIN_USERNAME && password === process.env.ADMIN_PASSWORD) {
       console.log('Credentials valid, generating token');
-      const token = sign({ username }, JWT_SECRET, { expiresIn: '1h' });
-      console.log('Token generated:', token);
+      
+      const token = await new SignJWT({ username })
+        .setProtectedHeader({ alg: 'HS256' })
+        .setExpirationTime('1h')
+        .sign(JWT_SECRET);
+      
+      console.log('Token generated');
       
       const response = NextResponse.json({ token, message: 'Login successful' });
       response.cookies.set('admin_token', token, { 
