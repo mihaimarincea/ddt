@@ -1,11 +1,10 @@
 {
-    "functions": {
-      "app/api/admin/login/route.js": {
-        "maxDuration": 10
-      }, 
-      "github": {
-        "silent": true
-      }
+  "functions": {
+    "app/api/admin/login/route.js": {
+      "maxDuration": 10
     }
-    
+  },
+  "github": {
+    "silent": true
   }
+}
