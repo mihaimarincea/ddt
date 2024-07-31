@@ -669,5 +669,66 @@
     },
     "id": 1722372219228,
     "timestamp": "2024-07-30T20:43:39.228Z"
+  },
+  {
+    "input": {
+      "companyName": "TechInnovate Solutions",
+      "foundingYear": "2020",
+      "founderBackground": "Two co-founders with 10+ years experience in software development and AI. One previous successful exit.",
+      "productDescription": "AI-powered project management tool that predicts potential roadblocks and suggests optimal resource allocation.",
+      "targetMarket": "Mid-size tech companies, estimated market size of $5 billion",
+      "competitiveLandscape": "Main competitors are Asana, Trello, and Jira. We differentiate through our AI predictions and automated resource allocation suggestions.",
+      "revenueModel": "SaaS model with tiered pricing based on team size and feature access. Starting at $10/user/month.",
+      "financials": "Revenue: $2M, Gross Margin: 75%, Net Profit: -$500K (reinvesting in growth)",
+      "keyMetrics": "1. Monthly Recurring Revenue (MRR): $200K, 2. Customer Acquisition Cost (CAC): $1000, 3. User Retention Rate: 85%",
+      "fundingHistory": "Seed round: $1.5M (2020, Angel Investors), Series A: $5M (2022, TechVC Partners)",
+      "burnRate": "Current monthly burn rate: $300K, Runway: 18 months",
+      "intellectualProperty": "Two pending patents on our AI prediction algorithms. Trademark on our brand name and logo.",
+      "teamComposition": "25 total: 15 engineers, 4 sales, 3 marketing, 2 customer support, 1 CEO",
+      "regulatoryCompliance": "GDPR and CCPA compliant. Annual security audits conducted.",
+      "growthStrategy": "Focus on expanding enterprise client base, developing mobile app, and entering European market in next 2 years."
+    },
+    "analysis": {
+      "analysis": "TechInnovate Solutions, founded in 2020, offers an AI-powered project management tool targeting mid-size tech companies. The experienced founding team, differentiated product, and large target market are key strengths. However, the competitive landscape is challenging with established players like Asana and Jira. Financials show strong revenue and gross margins, but the company is still unprofitable due to growth investments. Key metrics like MRR and user retention are solid. The company has raised $6.5M to date with 18 months of runway. The team is engineering-heavy and IP strategy is in place. Growth plans to expand enterprise sales, launch mobile app, and enter Europe are promising but will require strong execution. Overall, TechInnovate has strong potential if it can effectively scale and compete, but faces risks in a crowded market and needs to balance growth with path to profitability.",
+      "dashboardData": {
+        "financialMetrics": {
+          "revenue": 2000000,
+          "grossMargin": 75,
+          "netProfit": -500000,
+          "burnRate": 300000
+        },
+        "swot": {
+          "strengths": [
+            "Experienced founding team with prior exit",
+            "Differentiated AI-powered product",
+            "Large $5B target market"
+          ],
+          "weaknesses": [
+            "High competition from established players",
+            "Still unprofitable due to growth investments",
+            "Needs funding to reach profitability"
+          ],
+          "opportunities": [
+            "Expanding enterprise sales",
+            "Launching mobile app for wider usage",
+            "Entering European market"
+          ],
+          "threats": [
+            "Tough competitive landscape",
+            "Balancing growth with profitability",
+            "Execution risk in new market expansion"
+          ]
+        },
+        "potentialMeter": 75,
+        "generalScore": 80,
+        "keyProblems": [
+          "Path to profitability",
+          "Scaling in competitive market",
+          "New market expansion"
+        ]
+      }
+    },
+    "id": 1722372625705,
+    "timestamp": "2024-07-30T20:50:25.705Z"
   }
 ]

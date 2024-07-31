@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { getEntries } from '../../../utils/dataStore';
 
 export default function AdminDashboard() {
   const [entries, setEntries] = useState([]);
@@ -9,34 +10,19 @@ export default function AdminDashboard() {
   const router = useRouter();
 
   useEffect(() => {
-    console.log('Dashboard component mounted');
-    const fetchEntries = async () => {
+    async function fetchEntries() {
       try {
-        console.log('Fetching entries...');
-        const response = await fetch('/api/admin/entries');
-        console.log('Entries response status:', response.status);
-        if (response.ok) {
-          const data = await response.json();
-          console.log('Entries data:', data);
-          setEntries(data);
-        } else {
-          console.error('Failed to fetch entries');
-          if (response.status === 401) {
-            console.log('Unauthorized, redirecting to login');
-            router.push('/admin/login');
-          }
-        }
+        const fetchedEntries = await getEntries();
+        setEntries(fetchedEntries);
       } catch (error) {
         console.error('Error fetching entries:', error);
       } finally {
         setLoading(false);
       }
-    };
+    }
 
     fetchEntries();
-  }, [router]);
-
-  console.log('Rendering dashboard, loading:', loading, 'entries:', entries);
+  }, []);
 
   if (loading) {
     return <div>Loading...</div>;
